@@ -1,7 +1,7 @@
 # Data
 Various data related projects and code examples for common data tasks.
 
-## Code_Examples
+## Code Examples
 This folder contains code examples for reference. This includes broad categories such as Imputation, Outlier Handling, Wrangling, etc.
 
 ## Streaming Platform Project
