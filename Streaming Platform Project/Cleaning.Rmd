@@ -1,0 +1,136 @@
+---
+title: "Streaming Service Data Cleaning"
+author: "Andrew Dineen"
+date: "2025-01-01"
+output: html_document
+---
+## Install and load packages
+```{r}
+install.packages("tidyr")
+install.packages("readr")
+install.packages("dplyr")
+
+
+```
+## Load and merge data
+```{r}
+streaming_data <- read_csv("C:/Users/addin.DESKTOP-VNI86BL/Desktop/Data/Streaming Platform Project/combined.csv")
+problems(streaming_data)
+print(nrow(streaming_data))
+
+sources <- read_csv("C:/Users/addin.DESKTOP-VNI86BL/Desktop/Data/Streaming Platform Project/sources.csv")
+problems(sources)
+print(nrow(sources))
+
+merged_data <- merge(streaming_data, sources, by.x = "source_id", by.y="id")
+
+```
+
+## Drop unwanted data and rename columns
+```{r}
+#Check if title and primaryTitle are equivalent (yes)
+all(merged_data$title == merged_data$primaryTitle)
+merged_data[merged_data$title != merged_data$primaryTitle, ]
+
+#Are these two columns the same?
+all(merged_data$year == merged_data$startYear)
+merged_data[merged_data$year != merged_data$startYear, ]
+
+
+#Remove columns
+merged_data <- subset(merged_data, select = -c(source_id, id, tmdb_id, tmdb_type, tconst_x, type, originalTitle, runtimeMinutes, tconst_y, tconst, nconst, birthYear, isAdult, deathYear, primaryProfession, knownForTitles, directors, writers, primaryTitle, year))
+glimpse(merged_data)
+
+
+merged_data <- merged_data %>% rename(director=primaryName, platform=name)
+```
+## Identify and fix issues
+```{r}
+#Get rid of stuff we don't need / want
+#Data types
+merged_data %>% filter(!is.na(as.numeric(title)))
+merged_data %>% filter(is.na(as.numeric(startYear)))
+
+#end year should probably be a number, lets use 0000 for blanks
+merged_data$endYear <- ifelse(merged_data$endYear == "\\N", "0000", merged_data$endYear)
+merged_data$endYear <- as.numeric(merged_data$endYear)
+
+
+#Range constraints
+summary(merged_data)
+
+
+#Uniqueness (really only the imdb id, by platform)
+all(duplicated(merged_data$imdb_id) == FALSE)
+duplicates <- merged_data %>%
+  group_by(imdb_id, platform) %>%
+  filter(n() > 1)
+duplicates[order(duplicates$imdb_id), ]
+merged_data_unique <- merged_data %>% 
+  group_by(imdb_id, platform) %>% 
+  slice(1) 
+
+#Verify the number of rows is what we expect after that last operation
+print(nrow(merged_data) - (nrow(duplicates)/ 2) == nrow(merged_data_unique))
+
+merged_data <- merged_data_unique
+
+#Category Verification
+unique(merged_data$titleType)
+#We're only interested in series and movies, not individual episodes
+merged_data <- merged_data %>% filter(titleType!="tvEpisode")
+#Are short and tvShort types the same? tvMovie and movie?
+#No, not exactly. 
+#short: theatrical release or film festival
+#tvShort: designed for television
+#These aren't universal to the film industry just what IMDB decided to use
+
+#Cross field validation: Make sure start year comes before end year
+merged_data %>% filter(endYear != "\\N") %>% filter(endYear < startYear)
+
+#Missing data
+#These were both releases in 2019
+summary(merged_data)
+
+#empty strings
+merged_data %>% filter(title == "" | titleType == "" | genres == "" | platform == "")
+
+
+merged_data[is.na(merged_data$startYear), ]
+merged_data$startYear <- ifelse(is.na(merged_data$startYear), 2019, merged_data$startYear)
+
+#Save final result for use in Tableau
+write.csv(merged_data, file = "C:/Users/addin.DESKTOP-VNI86BL/Desktop/Data/Streaming Platform Project/combined_cleaned.csv", row.names = FALSE)
+```
+
+#Split out Genre
+```{r}
+library("tidyr")
+library("readr")
+library("dplyr")
+
+streaming_data <- read_csv("C:/Users/addin.DESKTOP-VNI86BL/Desktop/Data/Streaming Platform Project/combined_cleaned.csv")
+
+# Assuming your dataframe is named 'movies'
+genres <- streaming_data %>% 
+  select(imdb_id, genres) %>%  # Select only the relevant columns
+  separate_rows(genres, sep = ",") 
+
+genres <- genres %>% rename(genre = genres)
+genres <- genres %>% distinct(imdb_id, genre)
+
+duplicates <- genres %>%
+  group_by(imdb_id, genre) %>%
+  filter(n() > 1)
+
+unique_combined <- length(unique(streaming_data$imdb_id))
+unique_genres <- length(unique(genres$imdb_id))
+
+print(unique_combined)
+print(unique_genres)
+
+write.csv(genres, file = "C:/Users/addin.DESKTOP-VNI86BL/Desktop/Data/Streaming Platform Project/genres.csv", row.names = FALSE)
+# Rename the genres column if desired
+ 
+```
+

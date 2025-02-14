@@ -1,0 +1,3 @@
+*.env
+*.tsv
+*.tsv.gz
