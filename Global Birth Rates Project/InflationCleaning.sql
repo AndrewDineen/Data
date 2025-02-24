@@ -1,0 +1,326 @@
+--Profiling
+SELECT
+	*
+FROM
+	CPI_DIRTY
+LIMIT
+	20
+SELECT
+	COUNT(*)
+FROM
+	CPI_DIRTY
+	--One value: "FP.CPI.TOTL.ZG"
+	/*Inflation as measured by the consumer price index reflects the annual percentage change in the cost to the average consumer of acquiring a basket of goods and services that may be fixed or changed at specified intervals, such as yearly. 
+	The Laspeyres formula is generally used. */
+SELECT DISTINCT
+	INDICATOR_CODE
+FROM
+	CPI_DIRTY
+	--One value: "Inflation, consumer prices (annual %)"
+SELECT DISTINCT
+	INDICATOR_NAME
+FROM
+	CPI_DIRTY
+	--Countries with no data?
+SELECT
+	*
+FROM
+	CPI_DIRTY
+WHERE
+	COUNTRY NOT IN (
+		SELECT
+			COUNTRY
+		FROM
+			CPI_DIRTY
+		WHERE
+			INDICATOR_VALUE <> 0
+	)
+SELECT
+	*
+FROM
+	CPI_DIRTY
+WHERE
+	COUNTRY = 'AND'
+	--Delete irrelevant data
+BEGIN;
+
+--We don't need countries where no data exists
+DELETE FROM CPI_DIRTY
+WHERE
+	COUNTRY NOT IN (
+		SELECT
+			COUNTRY
+		FROM
+			CPI_DIRTY
+		WHERE
+			INDICATOR_VALUE <> 0
+	)
+	--We don't care about anything before 2000 or after 2019
+DELETE FROM CPI_DIRTY
+WHERE
+	CAST(OBS_YEAR AS INTEGER) NOT BETWEEN 2000 AND 2019;
+
+--We don't need the columns where all are the same, we'll just document the values
+ALTER TABLE CPI_DIRTY
+DROP COLUMN INDICATOR_NAME,
+DROP COLUMN INDICATOR_CODE;
+
+ROLLBACK;
+
+COMMIT;
+
+--Type Constraints
+SELECT
+	CAST(OBS_YEAR AS INTEGER) AS VALID_INT
+FROM
+	CPI_DIRTY
+	--Remenant from transformation
+SELECT
+	COUNTRY,
+	INDICATOR_VALUE
+FROM
+	CPI_DIRTY
+WHERE
+	OBS_YEAR = '...69'
+	AND INDICATOR_VALUE <> 0
+ORDER BY
+	COUNTRY
+SELECT
+	*
+FROM
+	CPI_DIRTY
+WHERE
+	COUNTRY_CODE = 'AUS'
+DELETE FROM CPI_DIRTY
+WHERE
+	OBS_YEAR = '...69'
+	--Range Constraints
+SELECT
+	MAX(CAST(OBS_YEAR AS INTEGER)),
+	MIN(CAST(OBS_YEAR AS INTEGER))
+FROM
+	CPI_DIRTY
+	--Uniqueness Constraints
+	--Values should be unique across country_code, year
+SELECT
+	COUNTRY_CODE,
+	OBS_YEAR,
+	COUNT(*)
+FROM
+	CPI_DIRTY
+GROUP BY
+	COUNTRY_CODE,
+	OBS_YEAR
+HAVING
+	COUNT(*) > 1
+	--Membership Constraints (Categorical)
+	--Fix all the typos
+SELECT DISTINCT
+	COUNTRY,
+	COUNTRY_CODE
+FROM
+	CPI_DIRTY
+ORDER BY
+	COUNTRY
+SELECT
+	*
+FROM
+	CPI_DIRTY
+WHERE
+	COUNTRY_CODE = 'NAM'
+UPDATE CPI_DIRTY
+SET
+	COUNTRY = 'China'
+WHERE
+	COUNTRY_CODE = 'CHN';
+
+UPDATE CPI_DIRTY
+SET
+	COUNTRY_CODE = 'NAM'
+WHERE
+	COUNTRY = '0mibia';
+
+UPDATE CPI_DIRTY
+SET
+	COUNTRY = 'Namibia'
+WHERE
+	COUNTRY_CODE = 'NAM';
+
+UPDATE CPI_DIRTY
+SET
+	COUNTRY = 'Nauru'
+WHERE
+	COUNTRY = '0uru';
+
+UPDATE CPI_DIRTY
+SET
+	COUNTRY = 'Bosnia and Herzegovina'
+WHERE
+	COUNTRY_CODE = 'BIH';
+
+UPDATE CPI_DIRTY
+SET
+	COUNTRY = 'Botswana'
+WHERE
+	COUNTRY_CODE = 'BWA';
+
+UPDATE CPI_DIRTY
+SET
+	COUNTRY = 'Burkina Faso'
+WHERE
+	COUNTRY_CODE = 'BFA';
+
+UPDATE CPI_DIRTY
+SET
+	COUNTRY = 'Canada'
+WHERE
+	COUNTRY_CODE = 'CAN';
+
+UPDATE CPI_DIRTY
+SET
+	COUNTRY = 'Guyana'
+WHERE
+	COUNTRY_CODE = 'GUY';
+
+UPDATE CPI_DIRTY
+SET
+	COUNTRY = 'Hong Kong SAR, China'
+WHERE
+	COUNTRY_CODE = 'HKG';
+
+UPDATE CPI_DIRTY
+SET
+	COUNTRY = 'Panama'
+WHERE
+	COUNTRY_CODE = 'PAN';
+
+UPDATE CPI_DIRTY
+SET
+	COUNTRY = 'Suriname'
+WHERE
+	COUNTRY_CODE = 'SUR';
+
+UPDATE CPI_DIRTY
+SET
+	COUNTRY = 'Viet Nam'
+WHERE
+	COUNTRY_CODE = 'VNM';
+
+UPDATE CPI_DIRTY
+SET
+	COUNTRY_CODE = 'NAC'
+WHERE
+	COUNTRY = 'North America';
+
+UPDATE CPI_DIRTY
+SET
+	COUNTRY = 'Macao SAR, China'
+WHERE
+	COUNTRY_CODE = 'MAC';
+
+--Each country code should belong to exactly one country
+SELECT
+	C1.COUNTRY_CODE
+FROM
+	CPI_DIRTY C1
+	JOIN CPI_DIRTY C2 ON C1.COUNTRY_CODE = C2.COUNTRY_CODE
+WHERE
+	C1.COUNTRY <> C2.COUNTRY
+SELECT
+	C1.COUNTRY_CODE
+FROM
+	CPI_DIRTY C1
+	JOIN CPI_DIRTY C2 ON C1.COUNTRY = C2.COUNTRY
+WHERE
+	C1.COUNTRY_CODE <> C2.COUNTRY_CODE
+	--Missing Data (MCAR, MAR, MNAR)
+	--Are we okay with the amount of missing data?
+	--Any missing more than 40%?
+SELECT
+	*
+FROM
+	(
+		SELECT
+			COUNTRY,
+			(
+				SUM(
+					CASE
+						WHEN INDICATOR_VALUE = 0 THEN 1
+						ELSE 0
+					END
+				) / COUNT(*)::NUMERIC * 100
+			) AS PERCENT_MISSING
+		FROM
+			CPI_DIRTY
+		GROUP BY
+			COUNTRY
+	)
+WHERE
+	PERCENT_MISSING >= 1
+ORDER BY
+	PERCENT_MISSING DESC
+DELETE FROM CPI_DIRTY
+WHERE
+	COUNTRY IN (
+		SELECT
+			COUNTRY
+		FROM
+			(
+				SELECT
+					COUNTRY,
+					(
+						SUM(
+							CASE
+								WHEN INDICATOR_VALUE = 0 THEN 1
+								ELSE 0
+							END
+						) / COUNT(*)::NUMERIC * 100
+					) AS PERCENT_MISSING
+				FROM
+					CPI_DIRTY
+				GROUP BY
+					COUNTRY
+			)
+		WHERE
+			PERCENT_MISSING >= 39
+	)
+	--Of the remaining, are any missing more than 5 consecutive years?
+DELETE FROM CPI_DIRTY
+WHERE
+	COUNTRY_CODE IN (
+		SELECT
+			COUNTRY_CODE
+		FROM
+			(
+				SELECT
+					COUNTRY_CODE,
+					OBS_YEAR,
+					ROW_NUMBER() OVER (
+						PARTITION BY
+							COUNTRY_CODE
+						ORDER BY
+							OBS_YEAR
+					) AS RN
+				FROM
+					CPI_DIRTY
+				WHERE
+					INDICATOR_VALUE = 0
+			)
+		WHERE
+			RN > 4
+		GROUP BY
+			COUNTRY_CODE
+	)
+	--Address outliers (if necessary)
+SELECT
+	*
+FROM
+	CPI_DIRTY
+ORDER BY
+	INDICATOR_VALUE
+SELECT
+	*
+FROM
+	CPI_DIRTY
+ORDER BY
+	INDICATOR_VALUE DESC

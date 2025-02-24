@@ -1,0 +1,335 @@
+--Birds eye view
+SELECT
+	*
+FROM
+	LFP_CLEAN
+LIMIT
+	10
+SELECT
+	*
+FROM
+	CPI_CLEAN
+LIMIT
+	10
+SELECT
+	*
+FROM
+	FRT_CLEAN
+LIMIT
+	10
+SELECT
+	*
+FROM
+	FRT_CLEAN_NEW
+LIMIT
+	10
+	--Standardize column names
+BEGIN;
+
+--Labour Force Participation
+ALTER TABLE LFP_CLEAN
+RENAME COLUMN REF_AREA TO COUNTRY;
+
+ALTER TABLE LFP_CLEAN
+RENAME COLUMN "time" TO OBS_YEAR;
+
+ALTER TABLE LFP_CLEAN
+RENAME COLUMN OBS_VALUE TO LFP_VALUE;
+
+--Consumer Price Index
+ALTER TABLE CPI_CLEAN
+RENAME COLUMN INDICATOR_VALUE TO CPI_VALUE;
+
+--Fertility
+ALTER TABLE FRT_CLEAN
+RENAME COLUMN "Country or Area" TO COUNTRY;
+
+ALTER TABLE FRT_CLEAN
+RENAME COLUMN "Country or Area Code" TO COUNTRY_CODE;
+
+ALTER TABLE FRT_CLEAN
+RENAME COLUMN "Value" TO FRT_VALUE;
+
+ALTER TABLE FRT_CLEAN
+RENAME COLUMN "Date" TO OBS_YEAR;
+
+COMMIT;
+
+--Year should be an integer, not a date serial
+--Identify rows that share the same year
+SELECT
+	COUNTRY,
+	COUNTRY_CODE,
+	"Indicator",
+	CAST(OBS_YEAR AS INTEGER) AS OBS_YEAR,
+	COUNT(*) AS NUM_ROWS
+FROM
+	FRT_CLEAN
+GROUP BY
+	COUNTRY,
+	COUNTRY_CODE,
+	"Indicator",
+	CAST(OBS_YEAR AS INTEGER)
+HAVING
+	COUNT(*) = 1
+	----Average the whole year's observations
+SELECT
+	COUNTRY,
+	COUNTRY_CODE,
+	"Indicator",
+	CAST(OBS_YEAR AS INTEGER) AS OBS_YEAR,
+	AVG(FRT_VALUE) AS FRT_VALUE
+FROM
+	FRT_CLEAN
+GROUP BY
+	COUNTRY,
+	COUNTRY_CODE,
+	"Indicator",
+	CAST(OBS_YEAR AS INTEGER)
+	--Spot check to ensure validity of query
+	--Multiple exist
+SELECT
+	*
+FROM
+	FRT_CLEAN
+WHERE
+	COUNTRY = 'Pakistan'
+	AND "Indicator" = 'TFR'
+	AND CAST(OBS_YEAR AS INTEGER) = 2007
+SELECT
+	*
+FROM
+	(
+		SELECT
+			COUNTRY,
+			COUNTRY_CODE,
+			"Indicator",
+			CAST(OBS_YEAR AS INTEGER) AS OBS_YEAR,
+			AVG(FRT_VALUE) AS FRT_VALUE
+		FROM
+			FRT_CLEAN
+		GROUP BY
+			COUNTRY,
+			COUNTRY_CODE,
+			"Indicator",
+			CAST(OBS_YEAR AS INTEGER)
+	)
+WHERE
+	COUNTRY = 'Pakistan'
+	AND "Indicator" = 'TFR'
+	AND OBS_YEAR = 2007
+SELECT
+	*
+FROM
+	FRT_CLEAN
+WHERE
+	COUNTRY = 'Afghanistan'
+	AND "Indicator" = 'MAC'
+	AND CAST(OBS_YEAR AS INTEGER) = 2011
+SELECT
+	*
+FROM
+	(
+		SELECT
+			COUNTRY,
+			COUNTRY_CODE,
+			"Indicator",
+			CAST(OBS_YEAR AS INTEGER) AS OBS_YEAR,
+			AVG(FRT_VALUE) AS FRT_VALUE
+		FROM
+			FRT_CLEAN
+		GROUP BY
+			COUNTRY,
+			COUNTRY_CODE,
+			"Indicator",
+			CAST(OBS_YEAR AS INTEGER)
+	)
+WHERE
+	COUNTRY = 'Afghanistan'
+	AND "Indicator" = 'MAC'
+	AND OBS_YEAR = 2011
+	--One exists
+SELECT
+	*
+FROM
+	FRT_CLEAN
+WHERE
+	COUNTRY = 'Cambodia'
+	AND "Indicator" = 'MAC'
+	AND CAST(OBS_YEAR AS INTEGER) = 2002
+SELECT
+	*
+FROM
+	(
+		SELECT
+			COUNTRY,
+			COUNTRY_CODE,
+			"Indicator",
+			CAST(OBS_YEAR AS INTEGER) AS OBS_YEAR,
+			AVG(FRT_VALUE) AS FRT_VALUE
+		FROM
+			FRT_CLEAN
+		GROUP BY
+			COUNTRY,
+			COUNTRY_CODE,
+			"Indicator",
+			CAST(OBS_YEAR AS INTEGER)
+	)
+WHERE
+	COUNTRY = 'Cambodia'
+	AND "Indicator" = 'MAC'
+	AND OBS_YEAR = 2002
+	--Create a new table for the transformation
+CREATE TABLE FRT_CLEAN_NEW AS (
+	SELECT
+		COUNTRY,
+		COUNTRY_CODE,
+		"Indicator",
+		CAST(OBS_YEAR AS INTEGER) AS OBS_YEAR,
+		AVG(FRT_VALUE) AS FRT_VALUE
+	FROM
+		FRT_CLEAN
+	GROUP BY
+		COUNTRY,
+		COUNTRY_CODE,
+		"Indicator",
+		CAST(OBS_YEAR AS INTEGER)
+)
+--Rename old table
+ALTER TABLE FRT_CLEAN
+RENAME TO FRT_CLEAN_OLD
+--Standardize country naming conventions
+SELECT
+	*
+FROM
+	(
+		SELECT DISTINCT
+			LFP.COUNTRY AS LFP_COUNTRY,
+			CPI.COUNTRY AS CPI_COUNTRY
+		FROM
+			LFP_CLEAN LFP
+			FULL OUTER JOIN CPI_CLEAN CPI ON LFP.COUNTRY = CPI.COUNTRY
+		ORDER BY
+			LFP.COUNTRY,
+			CPI.COUNTRY
+	)
+WHERE
+	LFP_COUNTRY IS NULL
+	OR CPI_COUNTRY IS NULL
+--Handle manually in theis case
+--Note: If there are a lot of values, it could be worth using fuzzywuzzy in Python
+UPDATE CPI_CLEAN
+SET
+	COUNTRY = 'Bahamas'
+WHERE
+	COUNTRY = 'Bahamas, The'
+UPDATE CPI_CLEAN
+SET
+	COUNTRY = 'Bolivia (Plurinational State of)'
+WHERE
+	COUNTRY = 'Bolivia'
+UPDATE CPI_CLEAN
+SET
+	COUNTRY = 'Congo'
+WHERE
+	COUNTRY = 'Congo, Rep.'
+UPDATE CPI_CLEAN
+SET
+	COUNTRY = 'Congo, Democratic Republic of the'
+WHERE
+	COUNTRY = 'Democratic Republic of the'
+UPDATE CPI_CLEAN
+SET
+	COUNTRY = 'Côte d''Ivoire'
+WHERE
+	COUNTRY = 'Cote d''Ivoire'
+UPDATE CPI_CLEAN
+SET
+	COUNTRY = 'Curaçao'
+WHERE
+	COUNTRY = 'Curacao'
+UPDATE CPI_CLEAN
+SET
+	COUNTRY = 'Egypt'
+WHERE
+	COUNTRY = 'Egypt, Arab Rep.'
+UPDATE CPI_CLEAN
+SET
+	COUNTRY = 'Gambia'
+WHERE
+	COUNTRY = 'Gambia, The'
+UPDATE CPI_CLEAN
+SET
+	COUNTRY = 'Grenada'
+WHERE
+	COUNTRY = 'Gre0da'
+UPDATE CPI_CLEAN
+SET
+	COUNTRY = 'Ghana'
+WHERE
+	COUNTRY = 'Gha0'
+UPDATE CPI_CLEAN
+SET
+	COUNTRY = 'Hong Kong, China'
+WHERE
+	COUNTRY = 'Hong Kong'
+UPDATE CPI_CLEAN
+SET
+	COUNTRY = 'Hong Kong, China'
+WHERE
+	COUNTRY = 'Hong Kong SAR, China'
+UPDATE CPI_CLEAN
+SET
+	COUNTRY = 'Iran (Islamic Republic of)'
+WHERE
+	COUNTRY = 'Iran, Islamic Rep.'
+UPDATE CPI_CLEAN
+SET
+	COUNTRY = 'Kyrgyzstan'
+WHERE
+	COUNTRY = 'Kyrgyz Republic'
+UPDATE CPI_CLEAN
+SET
+	COUNTRY = 'Lao People''s Democratic Republic'
+WHERE
+	COUNTRY = 'Lao PDR'
+UPDATE CPI_CLEAN
+SET
+	COUNTRY = 'Macao, China'
+WHERE
+	COUNTRY = 'Macao SAR, China'
+UPDATE CPI_CLEAN
+SET
+	COUNTRY = 'Micronesia (Federated States of)'
+WHERE
+	COUNTRY = 'Micronesia, Fed. Sts.'
+UPDATE CPI_CLEAN
+SET
+	COUNTRY = 'Republic of Korea'
+WHERE
+	COUNTRY = 'Korea, Rep.'
+UPDATE CPI_CLEAN
+SET
+	COUNTRY = 'Republic of Moldova'
+WHERE
+	COUNTRY = 'Moldova'
+UPDATE CPI_CLEAN
+SET
+	COUNTRY = 'Saint Lucia'
+WHERE
+	COUNTRY = 'St. Lucia'
+UPDATE CPI_CLEAN
+SET
+	COUNTRY = 'Türkiye'
+WHERE
+	COUNTRY = 'Turkiye'
+UPDATE CPI_CLEAN
+SET
+	COUNTRY = 'United Kingdom of Great Britain and Northern Ireland'
+WHERE
+	COUNTRY = 'United Kingdom'
+UPDATE CPI_CLEAN
+SET
+	COUNTRY = 'United States of America'
+WHERE
+	COUNTRY = 'United States'
