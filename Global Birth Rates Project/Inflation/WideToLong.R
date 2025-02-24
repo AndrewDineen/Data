@@ -9,4 +9,4 @@ glimpse(inflation_df)
 inflation_df_long <- inflation_df %>% pivot_longer(cols=5:69,
                                                    names_to = "year",
                                                    values_to = "value")
-write.csv(inflation_df_long, )
+write.csv(inflation_df_long, file ="inflation_long.csv")
